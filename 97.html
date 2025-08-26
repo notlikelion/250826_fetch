@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>포켓몬 검색기 - 자동완성</title>
+    <style>
+      @font-face {
+        font-family: "Simple";
+        src: url("https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_2307-1@1.1/Danjo-bold-Regular.woff2")
+          format("woff2");
+        font-weight: normal;
+        font-display: swap;
+      }
+
+      body,
+      input {
+        font-family: "Simple";
+        margin: 0;
+        padding: 20px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
+      }
+
+      /* section */
+      section {
+        margin: 1rem 2rem;
+      }
+
+      /* controller */
+      #search-container {
+        position: relative;
+        width: 280px;
+        margin: 0 auto;
+      }
+
+      #search-form {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        align-items: center;
+      }
+
+      #search-form input,
+      #search-form button {
+        width: 280px;
+        margin: 0;
+        padding: 12px;
+        border: none;
+        border-radius: 8px;
+        font-size: 16px;
+      }
+
+      #poke-name {
+        background: white;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        outline: none;
+        transition: all 0.3s ease;
+      }
+
+      #poke-name:focus {
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+        transform: translateY(-2px);
+      }
+
+      /* 자동완성 드롭다운 */
+      #autocomplete-list {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        background: white;
+        border-radius: 0 0 8px 8px;
+        max-height: 200px;
+        overflow-y: auto;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+        z-index: 1000;
+        display: none;
+      }
+
+      .autocomplete-item {
+        padding: 12px 16px;
+        cursor: pointer;
+        border-bottom: 1px solid #eee;
+        transition: background-color 0.2s ease;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .autocomplete-item:hover,
+      .autocomplete-item.selected {
+        background-color: #f0f8ff;
+      }
+
+      .autocomplete-item:last-child {
+        border-bottom: none;
+        border-radius: 0 0 8px 8px;
+      }
+
+      .pokemon-number {
+        color: #666;
+        font-size: 0.9em;
+        min-width: 40px;
+      }
+
+      .pokemon-name {
+        font-weight: bold;
+        color: #333;
+      }
+
+      /* 버튼 스타일 */
+      #random-btn {
+        background: linear-gradient(45deg, #ffcb05, #ffdd57);
+        color: #333;
+        font-weight: bold;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        border: none;
+        box-shadow: 0 2px 10px rgba(255, 203, 5, 0.3);
+      }
+
+      #random-btn:hover {
+        background: linear-gradient(45deg, #ffdd57, #ffcb05);
+        transform: translateY(-2px);
+        box-shadow: 0 4px 15px rgba(255, 203, 5, 0.4);
+      }
+
+      #search-form-btn {
+        background: linear-gradient(45deg, #3d7dca, #5ba0f2);
+        color: white;
+        cursor: pointer;
+        border: none;
+        box-shadow: 0 2px 10px rgba(61, 125, 202, 0.3);
+        transition: all 0.3s ease;
+      }
+
+      #search-form-btn:hover {
+        background: linear-gradient(45deg, #5ba0f2, #3d7dca);
+        transform: translateY(-2px);
+        box-shadow: 0 4px 15px rgba(61, 125, 202, 0.4);
+      }
+
+      /* container */
+      #container,
+      #poke-info > section {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        align-items: center;
+      }
+
+      /* 포켓몬 카드 스타일 */
+      #poke-info {
+        background: white;
+        border-radius: 20px;
+        padding: 30px;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+        max-width: 350px;
+        margin: 20px auto;
+        transform: scale(0.95);
+        opacity: 0;
+        transition: all 0.5s ease;
+      }
+
+      #poke-info.show {
+        transform: scale(1);
+        opacity: 1;
+      }
+
+      #poke-info img {
+        width: 180px;
+        height: 180px;
+        border-radius: 50%;
+        background: radial-gradient(circle, #ffffff, #f8f9fa);
+        padding: 15px;
+        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+        transition: transform 0.3s ease;
+      }
+
+      #poke-info img:hover {
+        transform: scale(1.05) rotate(5deg);
+      }
+
+      .poke-name {
+        font-size: 1.3em;
+        margin: 0.3rem 0;
+        color: #333;
+      }
+
+      #poke-number {
+        background: linear-gradient(45deg, #667eea, #764ba2);
+        color: white;
+        padding: 5px 15px;
+        border-radius: 20px;
+        font-size: 0.9em;
+        font-weight: bold;
+        margin-bottom: 10px;
+      }
+
+      #message {
+        font-size: 1.2em;
+        color: white;
+        text-align: center;
+        padding: 30px;
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 15px;
+        backdrop-filter: blur(10px);
+        max-width: 400px;
+        margin: 20px auto;
+      }
+
+      .hide {
+        display: none;
+      }
+
+      /* 로딩 애니메이션 */
+      .loading {
+        color: white;
+        font-weight: bold;
+      }
+
+      .loading::after {
+        content: "";
+        animation: dots 1.5s infinite;
+      }
+
+      @keyframes dots {
+        0% {
+          content: "";
+        }
+        25% {
+          content: ".";
+        }
+        50% {
+          content: "..";
+        }
+        75% {
+          content: "...";
+        }
+        100% {
+          content: "";
+        }
+      }
+
+      /* 반응형 디자인 */
+      @media (max-width: 600px) {
+        body {
+          padding: 10px;
+        }
+
+        #search-container,
+        #search-form input,
+        #search-form button {
+          width: 90vw;
+          max-width: 300px;
+        }
+
+        #poke-info {
+          margin: 10px;
+          padding: 20px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <section id="controller">
+      <div id="search-container">
+        <form id="search-form">
+          <input
+            type="text"
+            name="poke-name"
+            id="poke-name"
+            placeholder="포켓몬 이름을 입력해주세요 (예: 피카츄)"
+            autocomplete="off"
+          />
+          <div id="autocomplete-list"></div>
+          <button type="submit" id="search-form-btn">🔍 검색</button>
+          <button type="button" id="random-btn">🎲 랜덤 포켓몬</button>
+        </form>
+      </div>
+    </section>
+
+    <section id="container">
+      <div id="message">검색하거나 랜덤 버튼을 눌러보세요!</div>
+      <section class="hide" id="poke-info">
+        <div id="poke-number">#001</div>
+        <section>
+          <div class="poke-name">
+            <strong>이름</strong>: <span id="poke-koname">포켓몬</span>
+          </div>
+          <div class="poke-name">
+            <strong>영어</strong>: <span id="poke-enname">Pokemon</span>
+          </div>
+          <img src="" alt="포켓몬 사진" />
+        </section>
+      </section>
+    </section>
+
+    <script>
+      // 전역 변수들
+      let pokemonList = []; // 모든 포켓몬 정보 저장
+      let selectedIndex = -1; // 키보드 선택 인덱스
+
+      // 초기 포켓몬 데이터 로드
+      async function loadPokemonData() {
+        try {
+          const promises = [];
+          // 처음 151개 포켓몬 로드
+          for (let i = 1; i <= 151; i++) {
+            promises.push(fetchPokemonInfo(i));
+          }
+
+          const results = await Promise.all(promises);
+          pokemonList = results.filter((pokemon) => pokemon !== null);
+          console.log(`${pokemonList.length}마리 포켓몬 데이터 로드 완료!`);
+        } catch (error) {
+          console.error("포켓몬 데이터 로딩 실패:", error);
+        }
+      }
+
+      async function fetchPokemonInfo(id) {
+        try {
+          const [pokemonRes, speciesRes] = await Promise.all([
+            fetch(`https://pokeapi.co/api/v2/pokemon/${id}`),
+            fetch(`https://pokeapi.co/api/v2/pokemon-species/${id}`),
+          ]);
+
+          if (!pokemonRes.ok || !speciesRes.ok) return null;
+
+          const [pokemonData, speciesData] = await Promise.all([
+            pokemonRes.json(),
+            speciesRes.json(),
+          ]);
+
+          const koNames = speciesData.names.filter(
+            (x) => x.language.name === "ko"
+          );
+          const koName =
+            koNames.length > 0 ? koNames[0].name : pokemonData.name;
+
+          return {
+            id: id,
+            name: koName,
+            englishName: pokemonData.name,
+            sprite: pokemonData.sprites.front_default,
+          };
+        } catch (error) {
+          return null;
+        }
+      }
+
+      // 자동완성 기능
+      function showAutocomplete(inputValue) {
+        const autocompleteList = document.getElementById("autocomplete-list");
+
+        if (!inputValue.trim()) {
+          autocompleteList.style.display = "none";
+          return;
+        }
+
+        const filtered = pokemonList
+          .filter(
+            (pokemon) =>
+              pokemon.name.toLowerCase().includes(inputValue.toLowerCase()) ||
+              pokemon.englishName
+                .toLowerCase()
+                .includes(inputValue.toLowerCase())
+          )
+          .slice(0, 8); // 최대 8개만 표시
+
+        if (filtered.length === 0) {
+          autocompleteList.style.display = "none";
+          return;
+        }
+
+        autocompleteList.innerHTML = filtered
+          .map(
+            (pokemon, index) =>
+              `<div class="autocomplete-item" data-id="${pokemon.id}">
+            <span class="pokemon-number">#${pokemon.id
+              .toString()
+              .padStart(3, "0")}</span>
+            <span class="pokemon-name">${pokemon.name}</span>
+            <span style="color: #999; margin-left: auto;">${
+              pokemon.englishName
+            }</span>
+          </div>`
+          )
+          .join("");
+
+        autocompleteList.style.display = "block";
+        selectedIndex = -1;
+      }
+
+      // 자동완성 항목 선택
+      function selectAutocompleteItem(pokemon) {
+        document.getElementById("poke-name").value = pokemon.name;
+        document.getElementById("autocomplete-list").style.display = "none";
+        displayPokemon(pokemon);
+      }
+
+      // 키보드 네비게이션
+      function handleKeyNavigation(event) {
+        const autocompleteList = document.getElementById("autocomplete-list");
+        const items = autocompleteList.querySelectorAll(".autocomplete-item");
+
+        if (items.length === 0) return;
+
+        if (event.key === "ArrowDown") {
+          event.preventDefault();
+          selectedIndex = Math.min(selectedIndex + 1, items.length - 1);
+          updateSelection(items);
+        } else if (event.key === "ArrowUp") {
+          event.preventDefault();
+          selectedIndex = Math.max(selectedIndex - 1, -1);
+          updateSelection(items);
+        } else if (event.key === "Enter" && selectedIndex >= 0) {
+          event.preventDefault();
+          const selectedItem = items[selectedIndex];
+          const pokemonId = parseInt(selectedItem.dataset.id);
+          const pokemon = pokemonList.find((p) => p.id === pokemonId);
+          selectAutocompleteItem(pokemon);
+        } else if (event.key === "Escape") {
+          autocompleteList.style.display = "none";
+          selectedIndex = -1;
+        }
+      }
+
+      function updateSelection(items) {
+        items.forEach((item, index) => {
+          item.classList.toggle("selected", index === selectedIndex);
+        });
+      }
+
+      // 포켓몬 표시
+      function displayPokemon(pokemon) {
+        document.getElementById("poke-number").textContent = `#${pokemon.id
+          .toString()
+          .padStart(3, "0")}`;
+        document.getElementById("poke-koname").textContent = pokemon.name;
+        document.getElementById("poke-enname").textContent =
+          pokemon.englishName;
+        document.getElementById("container").querySelector("img").src =
+          pokemon.sprite;
+
+        const pokeInfo = document.getElementById("poke-info");
+        pokeInfo.classList.remove("hide");
+        // 애니메이션을 위한 약간의 딜레이
+        setTimeout(() => pokeInfo.classList.add("show"), 10);
+
+        document.getElementById("message").classList.add("hide");
+      }
+
+      // 검색 기능
+      async function searchPoke(event) {
+        event.preventDefault();
+
+        const name = document.getElementById("poke-name").value.trim();
+        if (!name) {
+          alert("포켓몬 이름을 입력해주세요!");
+          return;
+        }
+
+        const pokemon = pokemonList.find(
+          (p) =>
+            p.name.toLowerCase() === name.toLowerCase() ||
+            p.englishName.toLowerCase() === name.toLowerCase()
+        );
+
+        if (pokemon) {
+          displayPokemon(pokemon);
+        } else {
+          showMessage("존재하지 않는 포켓몬입니다!");
+        }
+      }
+
+      // 랜덤 포켓몬
+      function searchRandomPoke() {
+        if (pokemonList.length === 0) {
+          showMessage("포켓몬 데이터를 로딩 중입니다...");
+          return;
+        }
+
+        const randomPokemon =
+          pokemonList[Math.floor(Math.random() * pokemonList.length)];
+        document.getElementById("poke-name").value = randomPokemon.name;
+        displayPokemon(randomPokemon);
+      }
+
+      function showMessage(text) {
+        document.getElementById("message").textContent = text;
+        document.getElementById("message").className = "";
+        document.getElementById("poke-info").classList.add("hide");
+        document.getElementById("poke-info").classList.remove("show");
+        document.getElementById("message").classList.remove("hide");
+      }
+
+      // 이벤트 리스너들
+      document.addEventListener("DOMContentLoaded", async () => {
+        const input = document.getElementById("poke-name");
+        const autocompleteList = document.getElementById("autocomplete-list");
+
+        // 포켓몬 데이터 로드
+        showMessage("포켓몬 데이터를 불러오는 중입니다...");
+        await loadPokemonData();
+        showMessage("검색하거나 랜덤 버튼을 눌러보세요!");
+
+        // 입력 이벤트
+        input.addEventListener("input", (e) => {
+          showAutocomplete(e.target.value);
+        });
+
+        // 키보드 네비게이션
+        input.addEventListener("keydown", handleKeyNavigation);
+
+        // 자동완성 클릭 이벤트
+        autocompleteList.addEventListener("click", (e) => {
+          const item = e.target.closest(".autocomplete-item");
+          if (item) {
+            const pokemonId = parseInt(item.dataset.id);
+            const pokemon = pokemonList.find((p) => p.id === pokemonId);
+            selectAutocompleteItem(pokemon);
+          }
+        });
+
+        // 외부 클릭 시 자동완성 숨기기
+        document.addEventListener("click", (e) => {
+          if (!e.target.closest("#search-container")) {
+            autocompleteList.style.display = "none";
+            selectedIndex = -1;
+          }
+        });
+
+        // 폼 제출 및 랜덤 버튼
+        document
+          .getElementById("search-form")
+          .addEventListener("submit", searchPoke);
+        document
+          .getElementById("random-btn")
+          .addEventListener("click", searchRandomPoke);
+
+        // 첫 로드 시 랜덤 포켓몬 표시
+        setTimeout(searchRandomPoke, 1000);
+      });
+    </script>
+  </body>
+</html>
